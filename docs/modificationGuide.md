@@ -177,17 +177,6 @@ type TabId = "districts" | "videos" | "transcripts" | "analytics" | "my-tab";
 
 ## Changing Authentication
 
-### Adding MFA
-
-In the Cognito User Pool configuration in `cdk/lib/schoolbot-stack.ts`, add:
-
-```typescript
-mfa: cognito.Mfa.REQUIRED,
-mfaSecondFactor: {
-  sms: true,
-  otp: true,
-},
-```
 
 ### Allowing Self-Registration
 
