@@ -1,0 +1,42 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//Users/awsaruna/Documents/schoolbot-folder/**)",
+      "Bash(mkdir:*)",
+      "Bash(npx create-next-app:*)",
+      "Bash(npx cdk init:*)",
+      "Bash(npm install:*)",
+      "Bash(npm uninstall:*)",
+      "Bash(npm run build:*)",
+      "Bash(npx tsc:*)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:pypi.org)",
+      "WebFetch(domain:www.npmjs.com)",
+      "Bash(cat:*)",
+      "mcp__context7__resolve-library-id",
+      "mcp__aws-documentation__search_documentation",
+      "mcp__aws-documentation__read_documentation",
+      "Bash(npm show:*)",
+      "Bash(aws:*)",
+      "Bash(npx cdk bootstrap:*)",
+      "Bash(npx cdk deploy:*)",
+      "Bash(npx cdk:*)",
+      "Read(//tmp/**)",
+      "Bash(echo:*)",
+      "Bash(cdk:*)",
+      "Bash(brew upgrade:*)",
+      "mcp__aws-documentation__read_sections",
+      "Bash(script -q /dev/null npx cdk diff SchoolbotStack)",
+      "Bash(npx ts-node:*)",
+      "Bash(node_modules/.bin/cdk synth:*)",
+      "Bash(node_modules/.bin/cdk deploy:*)",
+      "Bash(NEXT_PUBLIC_API_URL=https://z08lrl1xj1.execute-api.us-east-1.amazonaws.com/prod/ npm run build)",
+      "Bash(curl:*)",
+      "Bash(zip:*)",
+      "Bash(NEXT_PUBLIC_API_URL=https://z08lrl1xj1.execute-api.us-east-1.amazonaws.com/prod npm run build)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
