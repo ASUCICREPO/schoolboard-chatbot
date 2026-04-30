@@ -6,6 +6,7 @@
   "dependencies": {
     "@aws-sdk/client-bedrock-agent": "^3",
     "@aws-sdk/client-dynamodb": "^3",
+    "@aws-sdk/client-lambda": "^3",
     "@aws-sdk/client-s3": "^3",
     "@aws-sdk/lib-dynamodb": "^3",
     "@aws-sdk/s3-request-presigner": "^3"

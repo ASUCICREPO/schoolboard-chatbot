@@ -8,6 +8,9 @@ import * as apigateway from 'aws-cdk-lib/aws-apigateway';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as logs from 'aws-cdk-lib/aws-logs';
 import * as s3n from 'aws-cdk-lib/aws-s3-notifications';
+import * as events from 'aws-cdk-lib/aws-events';
+import * as targets from 'aws-cdk-lib/aws-events-targets';
+import * as cognito from 'aws-cdk-lib/aws-cognito';
 import { Construct } from 'constructs';
 
 export class SchoolbotStack extends cdk.Stack {
@@ -17,7 +20,8 @@ export class SchoolbotStack extends cdk.Stack {
     // ── S3 Transcript Bucket ─────────────────────────────────────────────────
     const transcriptBucket = new s3.Bucket(this, 'TranscriptBucket', {
       bucketName: `schoolbot-transcripts-${this.account}`,
-      removalPolicy: cdk.RemovalPolicy.RETAIN,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+      autoDeleteObjects: true,
       cors: [
         {
           allowedMethods: [s3.HttpMethods.PUT, s3.HttpMethods.POST],
@@ -27,28 +31,18 @@ export class SchoolbotStack extends cdk.Stack {
       ],
     });
 
-    // ── DynamoDB Tables ──────────────────────────────────────────────────────
-    const districtsTable = new dynamodb.Table(this, 'DistrictsTable', {
-      tableName: 'schoolbot-districts',
-      partitionKey: { name: 'districtId', type: dynamodb.AttributeType.STRING },
-      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
-      removalPolicy: cdk.RemovalPolicy.RETAIN,
-    });
+    // ── DynamoDB Tables (retained from previous deploys) ────────────────────────
+    const districtsTable = dynamodb.Table.fromTableName(
+      this, 'DistrictsTable', 'schoolbot-districts',
+    );
 
-    const transcriptsTable = new dynamodb.Table(this, 'TranscriptsTable', {
-      tableName: 'schoolbot-transcripts',
-      partitionKey: { name: 'districtId', type: dynamodb.AttributeType.STRING },
-      sortKey: { name: 'videoId', type: dynamodb.AttributeType.STRING },
-      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
-      removalPolicy: cdk.RemovalPolicy.RETAIN,
-    });
+    const transcriptsTable = dynamodb.Table.fromTableName(
+      this, 'TranscriptsTable', 'schoolbot-transcripts',
+    );
 
-    const queryLogsTable = new dynamodb.Table(this, 'QueryLogsTable', {
-      tableName: 'schoolbot-query-logs',
-      partitionKey: { name: 'logId', type: dynamodb.AttributeType.STRING },
-      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
-      removalPolicy: cdk.RemovalPolicy.RETAIN,
-    });
+    const queryLogsTable = dynamodb.Table.fromTableName(
+      this, 'QueryLogsTable', 'schoolbot-query-logs',
+    );
 
     // ── S3 Vector Store (vector bucket + index for Bedrock KB) ───────────────
     const vectorBucket = new s3vectors.CfnVectorBucket(this, 'VectorBucket', {
@@ -90,7 +84,7 @@ export class SchoolbotStack extends cdk.Stack {
       statements: [
         new iam.PolicyStatement({
           actions: ['bedrock:InvokeModel'],
-          resources: [`arn:aws:bedrock:${this.region}::foundation-model/amazon.titan-embed-text-v2:0`],
+          resources: ['*'],
         }),
         new iam.PolicyStatement({
           actions: ['s3:GetObject', 's3:ListBucket'],
@@ -170,6 +164,30 @@ export class SchoolbotStack extends cdk.Stack {
       },
     });
 
+    // ── Cognito User Pool (admin authentication) ───────────────────────────────
+    const userPool = new cognito.UserPool(this, 'AdminUserPool', {
+      userPoolName: 'schoolbot-admin-pool',
+      selfSignUpEnabled: false, // Admins added manually in console
+      signInAliases: { username: true, email: true },
+      passwordPolicy: {
+        minLength: 8,
+        requireLowercase: true,
+        requireUppercase: true,
+        requireDigits: true,
+        requireSymbols: false,
+      },
+      removalPolicy: cdk.RemovalPolicy.RETAIN,
+    });
+
+    const userPoolClient = userPool.addClient('AdminAppClient', {
+      userPoolClientName: 'schoolbot-admin-app',
+      authFlows: {
+        userPassword: true,
+        userSrp: true,
+      },
+      generateSecret: false,
+    });
+
     // ── Lambda defaults ───────────────────────────────────────────────────────
     const commonEnv = {
       TRANSCRIPTS_BUCKET: transcriptBucket.bucketName,
@@ -206,6 +224,7 @@ export class SchoolbotStack extends cdk.Stack {
         ...commonEnv,
         BEDROCK_REGION: this.region,
         BEDROCK_MODEL_ID: 'us.anthropic.claude-haiku-4-5-20251001-v1:0',
+        AWS_ACCOUNT_ID: this.account,
       },
     });
 
@@ -216,6 +235,7 @@ export class SchoolbotStack extends cdk.Stack {
           'bedrock:RetrieveAndGenerate',
           'bedrock:Retrieve',
           'bedrock:InvokeModel',
+          'bedrock:GetInferenceProfile',
         ],
         resources: ['*'],
       }),
@@ -227,19 +247,28 @@ export class SchoolbotStack extends cdk.Stack {
       functionName: 'schoolbot-beam-admin-api',
       code: lambda.Code.fromAsset('lambda/admin-api'),
       handler: 'index.handler',
+      timeout: cdk.Duration.seconds(60),
       logGroup: lambdaLogGroup('AdminApiFnLogGroup'),
       environment: {
         ...commonEnv,
+        YOUTUBE_MONITOR_FN: 'schoolbot-youtube-monitor',
       },
     });
 
     transcriptBucket.grantReadWrite(adminApiFn);
     districtsTable.grantReadWriteData(adminApiFn);
     transcriptsTable.grantReadWriteData(adminApiFn);
+    queryLogsTable.grantReadData(adminApiFn);
     adminApiFn.addToRolePolicy(
       new iam.PolicyStatement({
         actions: ['bedrock:StartIngestionJob'],
         resources: [`arn:aws:bedrock:${this.region}:${this.account}:knowledge-base/*`],
+      }),
+    );
+    adminApiFn.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ['lambda:InvokeFunction'],
+        resources: [`arn:aws:lambda:${this.region}:${this.account}:function:schoolbot-youtube-monitor`],
       }),
     );
 
@@ -282,6 +311,36 @@ export class SchoolbotStack extends cdk.Stack {
       { prefix: 'uploads/' },
     );
 
+    // ── YouTube Monitor Lambda (Data API v3, scheduled) ──────────────────────
+    const youtubeMonitorFn = new lambda.Function(this, 'YoutubeMonitorFn', {
+      ...lambdaDefaults,
+      functionName: 'schoolbot-youtube-monitor',
+      code: lambda.Code.fromAsset('lambda/youtube-monitor'),
+      handler: 'index.handler',
+      timeout: cdk.Duration.minutes(5),
+      logGroup: lambdaLogGroup('YoutubeMonitorLogGroup'),
+      environment: {
+        TRANSCRIPTS_TABLE: transcriptsTable.tableName,
+        DISTRICTS_TABLE: districtsTable.tableName,
+        YOUTUBE_API_KEY: process.env.YOUTUBE_API_KEY ?? '',
+        AWS_NODEJS_CONNECTION_REUSE_ENABLED: '1',
+        NODE_OPTIONS: '--enable-source-maps',
+      },
+    });
+
+    transcriptsTable.grantReadWriteData(youtubeMonitorFn);
+    districtsTable.grantWriteData(youtubeMonitorFn);
+
+    // Poll every 6 hours (only ~72 quota units per run, well within 10,000/day)
+    const monitorSchedule = new events.Rule(this, 'YoutubeMonitorSchedule', {
+      ruleName: 'schoolbot-youtube-monitor',
+      description: 'Check YouTube channels for new board meeting videos',
+      schedule: events.Schedule.rate(cdk.Duration.hours(6)),
+    });
+    monitorSchedule.addTarget(new targets.LambdaFunction(youtubeMonitorFn, {
+      retryAttempts: 2,
+    }));
+
     // ── API Gateway ───────────────────────────────────────────────────────────
     const api = new apigateway.RestApi(this, 'SchoolbotApi', {
       restApiName: 'schoolbot-beam-api',
@@ -300,36 +359,85 @@ export class SchoolbotStack extends cdk.Stack {
       },
     });
 
+    // Add CORS headers to error responses (401, 403, 500)
+    const corsResponseHeaders = {
+      'Access-Control-Allow-Origin': "'*'",
+      'Access-Control-Allow-Headers': "'Content-Type,Authorization,X-Api-Key'",
+      'Access-Control-Allow-Methods': "'GET,POST,PUT,DELETE,OPTIONS'",
+    };
+    api.addGatewayResponse('Unauthorized', {
+      type: apigateway.ResponseType.UNAUTHORIZED,
+      responseHeaders: corsResponseHeaders,
+    });
+    api.addGatewayResponse('AccessDenied', {
+      type: apigateway.ResponseType.ACCESS_DENIED,
+      responseHeaders: corsResponseHeaders,
+    });
+    api.addGatewayResponse('Default4xx', {
+      type: apigateway.ResponseType.DEFAULT_4XX,
+      responseHeaders: corsResponseHeaders,
+    });
+    api.addGatewayResponse('Default5xx', {
+      type: apigateway.ResponseType.DEFAULT_5XX,
+      responseHeaders: corsResponseHeaders,
+    });
+
     const chatIntegration = new apigateway.LambdaIntegration(chatbotApiFn, {
       timeout: cdk.Duration.seconds(29),
     });
     const adminIntegration = new apigateway.LambdaIntegration(adminApiFn);
 
+    // Cognito authorizer for admin routes
+    const cognitoAuthorizer = new apigateway.CognitoUserPoolsAuthorizer(this, 'AdminAuthorizer', {
+      authorizerName: 'schoolbot-admin-authorizer',
+      cognitoUserPools: [userPool],
+    });
+    const authMethodOptions: apigateway.MethodOptions = {
+      authorizer: cognitoAuthorizer,
+      authorizationType: apigateway.AuthorizationType.COGNITO,
+    };
+
+    // Public routes
     const chatResource = api.root.addResource('chat');
     chatResource.addMethod('POST', chatIntegration);
 
     const districtsResource = api.root.addResource('districts');
     districtsResource.addMethod('GET', adminIntegration);
 
+    // Protected admin routes
     const adminResource = api.root.addResource('admin');
     const adminDistrictsResource = adminResource.addResource('districts');
-    adminDistrictsResource.addMethod('GET', adminIntegration);
-    adminDistrictsResource.addMethod('POST', adminIntegration);
+    adminDistrictsResource.addMethod('GET', adminIntegration, authMethodOptions);
+    adminDistrictsResource.addMethod('POST', adminIntegration, authMethodOptions);
 
     const adminDistrictItem = adminDistrictsResource.addResource('{districtId}');
-    adminDistrictItem.addMethod('PUT', adminIntegration);
-    adminDistrictItem.addMethod('DELETE', adminIntegration);
+    adminDistrictItem.addMethod('PUT', adminIntegration, authMethodOptions);
+    adminDistrictItem.addMethod('DELETE', adminIntegration, authMethodOptions);
 
     const adminTranscriptsResource = adminResource.addResource('transcripts');
-    adminTranscriptsResource.addMethod('GET', adminIntegration);
-    adminTranscriptsResource.addMethod('POST', adminIntegration); // Upload transcript
+    adminTranscriptsResource.addMethod('GET', adminIntegration, authMethodOptions);
+    adminTranscriptsResource.addMethod('POST', adminIntegration, authMethodOptions);
 
     const adminTranscriptItem = adminTranscriptsResource.addResource('{districtId}');
-    adminTranscriptItem.addMethod('GET', adminIntegration);
+    adminTranscriptItem.addMethod('GET', adminIntegration, authMethodOptions);
+    adminTranscriptItem.addMethod('DELETE', adminIntegration, authMethodOptions);
 
-    // Upload endpoint — returns presigned URL for direct S3 upload
     const adminUploadResource = adminResource.addResource('upload');
-    adminUploadResource.addMethod('POST', adminIntegration);
+    adminUploadResource.addMethod('POST', adminIntegration, authMethodOptions);
+
+    // Trigger YouTube scan
+    const adminScanResource = adminResource.addResource('scan');
+    adminScanResource.addMethod('POST', adminIntegration, authMethodOptions);
+
+    // Analytics
+    const adminAnalyticsResource = adminResource.addResource('analytics');
+    adminAnalyticsResource.addMethod('GET', adminIntegration, authMethodOptions);
+
+    const adminVideosResource = adminResource.addResource('videos');
+    adminVideosResource.addMethod('GET', adminIntegration, authMethodOptions);
+
+    const adminVideosItem = adminVideosResource.addResource('{districtId}');
+    adminVideosItem.addMethod('GET', adminIntegration, authMethodOptions);
 
     // ── Outputs ───────────────────────────────────────────────────────────────
     new cdk.CfnOutput(this, 'ApiUrl', {
@@ -363,6 +471,16 @@ export class SchoolbotStack extends cdk.Stack {
 
     new cdk.CfnOutput(this, 'KnowledgeBaseDataSourceId', {
       value: kbDataSource.attrDataSourceId,
+    });
+
+    new cdk.CfnOutput(this, 'UserPoolId', {
+      value: userPool.userPoolId,
+      description: 'Cognito User Pool ID (add admins here)',
+    });
+
+    new cdk.CfnOutput(this, 'UserPoolClientId', {
+      value: userPoolClient.userPoolClientId,
+      description: 'Cognito App Client ID (for frontend login)',
     });
   }
 }

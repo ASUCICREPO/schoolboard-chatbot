@@ -1,7 +1,10 @@
 #!/usr/bin/env node
 import 'source-map-support/register';
+import { config } from 'dotenv';
 import * as cdk from 'aws-cdk-lib';
 import { SchoolbotStack } from '../lib/schoolbot-stack';
+
+config();
 
 const app = new cdk.App();
 new SchoolbotStack(app, 'SchoolbotStack', {

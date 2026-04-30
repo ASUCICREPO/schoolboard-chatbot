@@ -174,13 +174,19 @@ export async function handler(event) {
 
       // Sync Bedrock KB
       if (BEDROCK_KB_ID && BEDROCK_KB_DATA_SOURCE_ID) {
-        await bedrockAgent.send(
-          new StartIngestionJobCommand({
-            knowledgeBaseId: BEDROCK_KB_ID,
-            dataSourceId: BEDROCK_KB_DATA_SOURCE_ID,
-          }),
-        );
-        console.log(`Triggered Bedrock KB sync for ${districtId}`);
+        try {
+          await bedrockAgent.send(
+            new StartIngestionJobCommand({
+              knowledgeBaseId: BEDROCK_KB_ID,
+              dataSourceId: BEDROCK_KB_DATA_SOURCE_ID,
+            }),
+          );
+          console.log(`Triggered Bedrock KB sync for ${districtId}`);
+        } catch (syncErr) {
+          console.error(`KB sync failed for ${districtId}:`, syncErr.message);
+        }
+      } else {
+        console.warn('KB sync skipped — BEDROCK_KB_ID or BEDROCK_KB_DATA_SOURCE_ID not set');
       }
 
       console.log(`Completed transcript for ${districtId}/${transcriptId}: ${content.length} chars`);

@@ -2,8 +2,8 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import type { ChatMessage } from "@/types";
-import { sendChatMessage } from "@/lib/api";
+import type { ChatMessage, District } from "@/types";
+import { sendChatMessage, fetchDistricts } from "@/lib/api";
 import ChatMessageComponent from "./ChatMessage";
 import { randomUUID } from "@/lib/uuid";
 import type { DistrictMeta } from "@/lib/districts";
@@ -18,9 +18,21 @@ export default function DistrictChatPage({ district }: Props) {
   const [sessionId, setSessionId] = useState<string | undefined>();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [transcriptCount, setTranscriptCount] = useState(0);
+  const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const router = useRouter();
+
+  useEffect(() => {
+    fetchDistricts().then((districts) => {
+      const d = districts.find((dd: District) => dd.districtId === district.id);
+      if (d) {
+        setTranscriptCount(d.transcriptCount ?? 0);
+        setLastUpdated(d.lastUpdated ?? null);
+      }
+    }).catch(() => {});
+  }, [district.id]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -111,7 +123,8 @@ export default function DistrictChatPage({ district }: Props) {
             {district.name}
           </div>
           <div className="text-xs" style={{ color: "var(--text-muted)" }}>
-            {district.meetings} meetings indexed
+            {transcriptCount} transcript{transcriptCount !== 1 ? "s" : ""} indexed
+            {lastUpdated && ` · Updated ${new Date(lastUpdated).toLocaleDateString()}`}
           </div>
         </div>
 
@@ -141,7 +154,7 @@ export default function DistrictChatPage({ district }: Props) {
                 Ask about {district.name}
               </p>
               <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-                Questions are answered using {district.meetings} meeting transcripts from this district.
+                Questions are answered using {transcriptCount} transcript{transcriptCount !== 1 ? "s" : ""} from this district.
               </p>
             </div>
 

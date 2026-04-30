@@ -1,0 +1,10 @@
+{
+  "name": "youtube-monitor",
+  "version": "1.0.0",
+  "description": "YouTube Data API v3 channel monitor for school board meetings",
+  "main": "index.mjs",
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3",
+    "@aws-sdk/lib-dynamodb": "^3"
+  }
+}

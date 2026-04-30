@@ -1,18 +1,25 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { DISTRICTS, UPDATED_DATES } from "@/lib/districts";
+import { fetchDistricts } from "@/lib/api";
+import type { District } from "@/types";
 
 export default function LandingPage() {
   const [search, setSearch] = useState("");
+  const [districts, setDistricts] = useState<District[]>([]);
   const router = useRouter();
+
+  useEffect(() => {
+    fetchDistricts().then(setDistricts).catch(() => {});
+  }, []);
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim();
-    if (!q) return DISTRICTS;
-    return DISTRICTS.filter((d) => d.name.toLowerCase().includes(q));
-  }, [search]);
+    const sorted = [...districts].sort((a, b) => a.name.localeCompare(b.name));
+    if (!q) return sorted;
+    return sorted.filter((d) => d.name.toLowerCase().includes(q) || d.districtId.toLowerCase().includes(q));
+  }, [search, districts]);
 
   return (
     <div className="min-h-screen flex flex-col" style={{ background: "var(--bg-dark)" }}>
@@ -55,18 +62,6 @@ export default function LandingPage() {
 
       {/* Hero */}
       <div className="flex flex-col items-center text-center px-4 pt-16 pb-10">
-        <div
-          className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-semibold mb-8 border"
-          style={{
-            background: "rgba(140,29,64,0.15)",
-            borderColor: "rgba(140,29,64,0.4)",
-            color: "var(--asu-gold)",
-          }}
-        >
-          <span style={{ color: "var(--asu-gold)" }}>✦</span>
-          AI-POWERED
-        </div>
-
         <h1
           className="text-4xl sm:text-5xl font-bold leading-tight mb-4 max-w-2xl"
           style={{ color: "var(--text-primary)" }}
@@ -118,8 +113,8 @@ export default function LandingPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {filtered.map((district) => (
                 <button
-                  key={district.id}
-                  onClick={() => router.push(`/district/${district.id}`)}
+                  key={district.districtId}
+                  onClick={() => router.push(`/district/${district.districtId}`)}
                   className="text-left p-4 rounded-xl border transition-all group"
                   style={{
                     background: "var(--bg-card)",
@@ -142,14 +137,16 @@ export default function LandingPage() {
                       <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                       </svg>
-                      {district.meetings} meetings
+                      {district.transcriptCount ?? 0} transcript{(district.transcriptCount ?? 0) !== 1 ? "s" : ""}
                     </span>
-                    <span className="flex items-center gap-1.5">
-                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                      Updated {UPDATED_DATES[district.id] ?? "Oct 2024"}
-                    </span>
+                    {district.lastUpdated && (
+                      <span className="flex items-center gap-1.5">
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        {new Date(district.lastUpdated).toLocaleDateString()}
+                      </span>
+                    )}
                   </div>
                 </button>
               ))}
@@ -161,7 +158,7 @@ export default function LandingPage() {
       {/* Footer */}
       <footer className="mt-auto py-8 text-center text-xs" style={{ color: "var(--text-muted)" }}>
         <p className="mb-1">
-          Starting with {DISTRICTS.length} districts — more coming soon.
+          {districts.length} districts — more coming soon.
         </p>
         <p className="mb-3">
           Have a district you&apos;d love to see?{" "}

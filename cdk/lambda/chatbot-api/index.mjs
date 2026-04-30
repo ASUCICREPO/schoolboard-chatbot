@@ -19,6 +19,7 @@ You answer questions about school board meetings based solely on the transcript 
 Rules:
 - Always answer using only the provided transcript excerpts
 - Be factual and cite specific meeting details (district, date) when possible
+- If the query specifies a district (shown in brackets like [District: xxx]), only use transcripts from that specific district
 - If the information is not in the transcripts, say "I don't have information about that in the available transcripts"
 - Keep responses concise and relevant
 - Do not refuse to answer questions about public school board meeting content`;
@@ -47,10 +48,12 @@ async function logQuery(query, districtId, answer, sessionId) {
           logId,
           sessionId,
           districtId: districtId ?? 'all',
-          queryHash: Buffer.from(query).toString('base64').slice(0, 32),
+          query: query.slice(0, 500),
           queryLength: query.length,
           answerLength: answer?.length ?? 0,
+          answered: answer && !answer.includes("don't have information") && !answer.includes("unable to assist"),
           timestamp: now.toISOString(),
+          date: now.toISOString().split('T')[0],
         },
       }),
     );
@@ -89,17 +92,13 @@ export async function handler(event) {
   try {
     const sid = sessionId ?? undefined;
 
-    const retrievalFilter = districtId
-      ? {
-          equals: {
-            key: 'districtId',
-            value: districtId,
-          },
-        }
-      : undefined;
+    // Prepend district context to query for better vector search relevance
+    const searchQuery = districtId
+      ? `[District: ${districtId}] ${query.trim()}`
+      : query.trim();
 
     const command = new RetrieveAndGenerateCommand({
-      input: { text: query.trim() },
+      input: { text: searchQuery },
       retrieveAndGenerateConfiguration: {
         type: 'KNOWLEDGE_BASE',
         knowledgeBaseConfiguration: {
@@ -107,12 +106,11 @@ export async function handler(event) {
           modelArn: BEDROCK_MODEL_ID.startsWith('arn:')
             ? BEDROCK_MODEL_ID
             : BEDROCK_MODEL_ID.match(/^(us\.|eu\.|ap\.|global\.)/)
-              ? `arn:aws:bedrock:${region}:${process.env.AWS_ACCOUNT_ID ?? '851725605779'}:inference-profile/${BEDROCK_MODEL_ID}`
+              ? `arn:aws:bedrock:${region}:${process.env.AWS_ACCOUNT_ID}:inference-profile/${BEDROCK_MODEL_ID}`
               : `arn:aws:bedrock:${region}::foundation-model/${BEDROCK_MODEL_ID}`,
           retrievalConfiguration: {
             vectorSearchConfiguration: {
               numberOfResults: 5,
-              ...(retrievalFilter ? { filter: retrievalFilter } : {}),
             },
           },
           generationConfiguration: {
