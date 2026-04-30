@@ -443,7 +443,7 @@ export default function AdminDashboard() {
     setToken(null);
   };
 
-  const getAuthHeaders = () => (token ? { Authorization: token } : {});
+  const getAuthHeaders = (): Record<string, string> => (token ? { Authorization: token } : {});
 
   // ── District CRUD handlers ─────────────────────────────────────────────────
 
@@ -549,7 +549,7 @@ export default function AdminDashboard() {
   // ── Data fetching ──────────────────────────────────────────────────────────
 
   const fetchData = useCallback(async () => {
-    const headers = token ? { Authorization: token } : {};
+    const headers: Record<string, string> = token ? { Authorization: token } : {};
     setLoading(true);
     setError(null);
     try {

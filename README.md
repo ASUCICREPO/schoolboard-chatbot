@@ -90,17 +90,7 @@ git clone https://github.com/ASUCICREPO/schoolbot.git
 cd schoolbot
 ```
 
-3. **Set up GitHub token (for Amplify auto-deploy)**
-
-```bash
-aws secretsmanager create-secret \
-  --name "github-token" \
-  --description "GitHub Personal Access Token for Amplify" \
-  --secret-string "your-github-token-here" \
-  --region us-west-2
-```
-
-4. **Run the deployment script**
+3. **Run the deployment script**
 
 ```bash
 bash ./deploy.sh

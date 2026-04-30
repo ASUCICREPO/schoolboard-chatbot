@@ -11,8 +11,6 @@ import * as s3n from 'aws-cdk-lib/aws-s3-notifications';
 import * as events from 'aws-cdk-lib/aws-events';
 import * as targets from 'aws-cdk-lib/aws-events-targets';
 import * as cognito from 'aws-cdk-lib/aws-cognito';
-import * as amplify from '@aws-cdk/aws-amplify-alpha';
-import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
 import { Construct } from 'constructs';
 
 export class SchoolbotStack extends cdk.Stack {
@@ -441,61 +439,7 @@ export class SchoolbotStack extends cdk.Stack {
     const adminVideosItem = adminVideosResource.addResource('{districtId}');
     adminVideosItem.addMethod('GET', adminIntegration, authMethodOptions);
 
-    // ── Amplify Hosting ─────────────────────────────────────────────────────
-    const githubToken = secretsmanager.Secret.fromSecretNameV2(
-      this, 'GitHubToken', 'github-token',
-    );
-
-    const amplifyApp = new amplify.App(this, 'SchoolbotFrontend', {
-      appName: 'schoolbot-beam',
-      sourceCodeProvider: new amplify.GitHubSourceCodeProvider({
-        owner: process.env.GITHUB_OWNER ?? 'ASUCICREPO',
-        repository: process.env.GITHUB_REPO ?? 'schoolbot',
-        oauthToken: githubToken.secretValue,
-      }),
-      buildSpec: cdk.aws_codebuild.BuildSpec.fromObjectToYaml({
-        version: 1,
-        applications: [
-          {
-            appRoot: 'frontend',
-            frontend: {
-              phases: {
-                preBuild: {
-                  commands: ['npm ci'],
-                },
-                build: {
-                  commands: ['npm run build'],
-                },
-              },
-              artifacts: {
-                baseDirectory: 'out',
-                files: ['**/*'],
-              },
-              cache: {
-                paths: ['node_modules/**/*'],
-              },
-            },
-          },
-        ],
-      }),
-      environmentVariables: {
-        NEXT_PUBLIC_API_URL: api.url,
-        NEXT_PUBLIC_COGNITO_USER_POOL_ID: userPool.userPoolId,
-        NEXT_PUBLIC_COGNITO_CLIENT_ID: userPoolClient.userPoolClientId,
-      },
-    });
-
-    const mainBranch = amplifyApp.addBranch('main', {
-      autoBuild: true,
-      stage: 'PRODUCTION',
-    });
-
     // ── Outputs ───────────────────────────────────────────────────────────────
-    new cdk.CfnOutput(this, 'AmplifyAppUrl', {
-      value: `https://main.${amplifyApp.defaultDomain}`,
-      description: 'Amplify frontend URL',
-    });
-
     new cdk.CfnOutput(this, 'ApiUrl', {
       value: api.url,
       description: 'API Gateway URL',
