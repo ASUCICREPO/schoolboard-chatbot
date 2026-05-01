@@ -111,16 +111,22 @@ export default function LandingPage() {
             </p>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {filtered.map((district) => (
+              {filtered.map((district) => {
+                const hasTranscripts = (district.transcriptCount ?? 0) > 0;
+                return (
                 <button
                   key={district.districtId}
-                  onClick={() => router.push(`/district/${district.districtId}`)}
+                  onClick={() => hasTranscripts && router.push(`/district/${district.districtId}`)}
+                  disabled={!hasTranscripts}
                   className="text-left p-4 rounded-xl border transition-all group"
                   style={{
                     background: "var(--bg-card)",
                     borderColor: "var(--border-subtle)",
+                    opacity: hasTranscripts ? 1 : 0.5,
+                    cursor: hasTranscripts ? "pointer" : "not-allowed",
                   }}
                   onMouseEnter={(e) => {
+                    if (!hasTranscripts) return;
                     e.currentTarget.style.background = "var(--bg-card-hover)";
                     e.currentTarget.style.borderColor = "var(--asu-maroon)";
                   }}
@@ -137,7 +143,9 @@ export default function LandingPage() {
                       <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                       </svg>
-                      {district.transcriptCount ?? 0} transcript{(district.transcriptCount ?? 0) !== 1 ? "s" : ""}
+                      {hasTranscripts
+                        ? `${district.transcriptCount} transcript${district.transcriptCount !== 1 ? "s" : ""}`
+                        : "No transcripts yet"}
                     </span>
                     {district.lastUpdated && (
                       <span className="flex items-center gap-1.5">
@@ -149,7 +157,8 @@ export default function LandingPage() {
                     )}
                   </div>
                 </button>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
