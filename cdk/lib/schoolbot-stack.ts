@@ -19,7 +19,6 @@ export class SchoolbotStack extends cdk.Stack {
 
     // ── S3 Transcript Bucket ─────────────────────────────────────────────────
     const transcriptBucket = new s3.Bucket(this, 'TranscriptBucket', {
-      bucketName: `schoolbot-transcripts-${this.account}`,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
       autoDeleteObjects: true,
       cors: [
@@ -31,18 +30,25 @@ export class SchoolbotStack extends cdk.Stack {
       ],
     });
 
-    // ── DynamoDB Tables (retained from previous deploys) ────────────────────────
-    const districtsTable = dynamodb.Table.fromTableName(
-      this, 'DistrictsTable', 'schoolbot-districts',
-    );
+    // ── DynamoDB Tables ──────────────────────────────────────────────────────
+    const districtsTable = new dynamodb.Table(this, 'DistrictsTable', {
+      partitionKey: { name: 'districtId', type: dynamodb.AttributeType.STRING },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
 
-    const transcriptsTable = dynamodb.Table.fromTableName(
-      this, 'TranscriptsTable', 'schoolbot-transcripts',
-    );
+    const transcriptsTable = new dynamodb.Table(this, 'TranscriptsTable', {
+      partitionKey: { name: 'districtId', type: dynamodb.AttributeType.STRING },
+      sortKey: { name: 'videoId', type: dynamodb.AttributeType.STRING },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
 
-    const queryLogsTable = dynamodb.Table.fromTableName(
-      this, 'QueryLogsTable', 'schoolbot-query-logs',
-    );
+    const queryLogsTable = new dynamodb.Table(this, 'QueryLogsTable', {
+      partitionKey: { name: 'logId', type: dynamodb.AttributeType.STRING },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
 
     // ── S3 Vector Store (vector bucket + index for Bedrock KB) ───────────────
     const vectorBucket = new s3vectors.CfnVectorBucket(this, 'VectorBucket', {
@@ -51,7 +57,7 @@ export class SchoolbotStack extends cdk.Stack {
 
     const vectorIndex = new s3vectors.CfnIndex(this, 'VectorIndex', {
       vectorBucketName: vectorBucket.vectorBucketName!,
-      indexName: 'schoolbot-index-v3',
+      indexName: 'schoolbot-index',
       dataType: 'float32',
       dimension: 1024,
       distanceMetric: 'cosine',
@@ -70,7 +76,6 @@ export class SchoolbotStack extends cdk.Stack {
 
     // ── Bedrock Knowledge Base IAM Service Role ───────────────────────────────
     const kbRole = new iam.Role(this, 'BedrockKBRole', {
-      roleName: 'schoolbot-bedrock-kb-role',
       assumedBy: new iam.ServicePrincipal('bedrock.amazonaws.com', {
         conditions: {
           StringEquals: { 'aws:SourceAccount': this.account },
@@ -80,7 +85,6 @@ export class SchoolbotStack extends cdk.Stack {
     });
 
     const kbPolicy = new iam.ManagedPolicy(this, 'BedrockKBPolicy', {
-      managedPolicyName: 'schoolbot-bedrock-kb-policy',
       statements: [
         new iam.PolicyStatement({
           actions: ['bedrock:InvokeModel'],
@@ -105,7 +109,7 @@ export class SchoolbotStack extends cdk.Stack {
           ],
           resources: [
             `arn:aws:s3vectors:${this.region}:${this.account}:bucket/schoolbot-vectors-${this.account}-${this.region}`,
-            `arn:aws:s3vectors:${this.region}:${this.account}:bucket/schoolbot-vectors-${this.account}-${this.region}/index/schoolbot-index-v3`,
+            `arn:aws:s3vectors:${this.region}:${this.account}:bucket/schoolbot-vectors-${this.account}-${this.region}/index/schoolbot-index`,
           ],
         }),
       ],
@@ -116,7 +120,7 @@ export class SchoolbotStack extends cdk.Stack {
     const knowledgeBase = new cdk.CfnResource(this, 'KnowledgeBase', {
       type: 'AWS::Bedrock::KnowledgeBase',
       properties: {
-        Name: 'schoolbot-knowledge-base-v3',
+        Name: `schoolbot-kb-${this.account}`,
         Description: 'The Beam – school board meeting transcripts knowledge base',
         RoleArn: kbRole.roleArn,
         KnowledgeBaseConfiguration: {
@@ -134,7 +138,7 @@ export class SchoolbotStack extends cdk.Stack {
           Type: 'S3_VECTORS',
           S3VectorsConfiguration: {
             VectorBucketArn: `arn:aws:s3vectors:${this.region}:${this.account}:bucket/schoolbot-vectors-${this.account}-${this.region}`,
-            IndexName: 'schoolbot-index-v3',
+            IndexName: 'schoolbot-index',
           },
         },
       },
@@ -215,7 +219,6 @@ export class SchoolbotStack extends cdk.Stack {
     // ── Chatbot API Lambda ────────────────────────────────────────────────────
     const chatbotApiFn = new lambda.Function(this, 'ChatbotApiFn', {
       ...lambdaDefaults,
-      functionName: 'schoolbot-chatbot-api',
       code: lambda.Code.fromAsset('lambda/chatbot-api'),
       handler: 'index.handler',
       timeout: cdk.Duration.seconds(60),
@@ -244,14 +247,13 @@ export class SchoolbotStack extends cdk.Stack {
     // ── Admin API Lambda ──────────────────────────────────────────────────────
     const adminApiFn = new lambda.Function(this, 'AdminApiFn', {
       ...lambdaDefaults,
-      functionName: 'schoolbot-beam-admin-api',
       code: lambda.Code.fromAsset('lambda/admin-api'),
       handler: 'index.handler',
       timeout: cdk.Duration.seconds(60),
       logGroup: lambdaLogGroup('AdminApiFnLogGroup'),
       environment: {
         ...commonEnv,
-        YOUTUBE_MONITOR_FN: 'schoolbot-youtube-monitor',
+        YOUTUBE_MONITOR_FN: '', // Set after monitor Lambda is created
       },
     });
 
@@ -265,17 +267,10 @@ export class SchoolbotStack extends cdk.Stack {
         resources: [`arn:aws:bedrock:${this.region}:${this.account}:knowledge-base/*`],
       }),
     );
-    adminApiFn.addToRolePolicy(
-      new iam.PolicyStatement({
-        actions: ['lambda:InvokeFunction'],
-        resources: [`arn:aws:lambda:${this.region}:${this.account}:function:schoolbot-youtube-monitor`],
-      }),
-    );
 
     // ── Transcript Processor Lambda (S3 upload triggered) ────────────────────
     const transcriptProcessorFn = new lambda.Function(this, 'TranscriptProcessorFn', {
       ...lambdaDefaults,
-      functionName: 'schoolbot-transcript-processor',
       code: lambda.Code.fromAsset('lambda/transcript-processor'),
       handler: 'index.handler',
       memorySize: 1024,
@@ -314,7 +309,6 @@ export class SchoolbotStack extends cdk.Stack {
     // ── YouTube Monitor Lambda (Data API v3, scheduled) ──────────────────────
     const youtubeMonitorFn = new lambda.Function(this, 'YoutubeMonitorFn', {
       ...lambdaDefaults,
-      functionName: 'schoolbot-youtube-monitor',
       code: lambda.Code.fromAsset('lambda/youtube-monitor'),
       handler: 'index.handler',
       timeout: cdk.Duration.minutes(5),
@@ -330,6 +324,10 @@ export class SchoolbotStack extends cdk.Stack {
 
     transcriptsTable.grantReadWriteData(youtubeMonitorFn);
     districtsTable.grantWriteData(youtubeMonitorFn);
+
+    // Set the monitor function name on the admin API (forward reference)
+    adminApiFn.addEnvironment('YOUTUBE_MONITOR_FN', youtubeMonitorFn.functionName);
+    youtubeMonitorFn.grantInvoke(adminApiFn);
 
     // Poll every 6 hours (only ~72 quota units per run, well within 10,000/day)
     const monitorSchedule = new events.Rule(this, 'YoutubeMonitorSchedule', {
@@ -385,7 +383,9 @@ export class SchoolbotStack extends cdk.Stack {
     const chatIntegration = new apigateway.LambdaIntegration(chatbotApiFn, {
       timeout: cdk.Duration.seconds(29),
     });
-    const adminIntegration = new apigateway.LambdaIntegration(adminApiFn);
+    const adminIntegration = new apigateway.LambdaIntegration(adminApiFn, {
+      timeout: cdk.Duration.seconds(29),
+    });
 
     // Cognito authorizer for admin routes
     const cognitoAuthorizer = new apigateway.CognitoUserPoolsAuthorizer(this, 'AdminAuthorizer', {

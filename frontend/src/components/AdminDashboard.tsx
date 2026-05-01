@@ -649,7 +649,8 @@ export default function AdminDashboard() {
           text: pasteModal.text,
         }),
       });
-      if (!res.ok) throw new Error("Failed to upload transcript");
+      // 502 can happen if KB sync takes too long — transcript still saves
+      if (!res.ok && res.status !== 502) throw new Error("Failed to upload transcript");
       setPasteModal(null);
       fetchData();
     } catch (err) {

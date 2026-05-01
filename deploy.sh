@@ -121,18 +121,35 @@ if [ "$CREATE_ADMIN" = "y" ] || [ "$CREATE_ADMIN" = "Y" ]; then
     --username "$ADMIN_USER" \
     --temporary-password "TempPass123!" \
     --message-action SUPPRESS \
-    --region "$AWS_REGION" 2>/dev/null || true
+    --region "$AWS_REGION" >/dev/null 2>&1 || true
 
   aws cognito-idp admin-set-user-password \
     --user-pool-id "$USER_POOL_ID" \
     --username "$ADMIN_USER" \
     --password "$ADMIN_PASS" \
     --permanent \
-    --region "$AWS_REGION"
+    --region "$AWS_REGION" >/dev/null 2>&1
 
   echo "[OK] Admin user '$ADMIN_USER' created"
 else
   echo "[SKIP] Skipping admin user creation"
+fi
+echo ""
+
+# ── Seed districts by triggering YouTube monitor ─────────────────────────────
+
+echo "Seeding districts..."
+MONITOR_FN=$(node -e "
+const cf = require('child_process');
+const out = cf.execSync('aws cloudformation describe-stack-resources --stack-name SchoolbotStack --logical-resource-id YoutubeMonitorFn4AFA596C --region $AWS_REGION --query \"StackResources[0].PhysicalResourceId\" --output text', {encoding:'utf8'}).trim();
+console.log(out);
+" 2>/dev/null) || true
+
+if [ -n "$MONITOR_FN" ]; then
+  aws lambda invoke --function-name "$MONITOR_FN" --payload '{}' --cli-binary-format raw-in-base64-out --region "$AWS_REGION" /dev/null >/dev/null 2>&1 || true
+  echo "[OK] Districts seeded"
+else
+  echo "[WARN] Could not find monitor function — run 'Scan YouTube Channels' from the admin dashboard"
 fi
 echo ""
 
