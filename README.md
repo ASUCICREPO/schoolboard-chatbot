@@ -7,7 +7,7 @@ An AI-powered platform that helps journalists and citizens understand what happe
 Watch the complete demonstration of The Beam School Board AI:
 
 <div align="center">
-  <a href="https://www.youtube.com/watch?v=yYmPD45WhIM"  target="_blank">
+  <a href="https://www.youtube.com/watch?v=yYmPD45WhIM" target="_blank" rel="noopener noreferrer">
     <img src="./docs/media/demo-thumbnail.png" alt="The Beam School Board AI Demo" width="650">
   </a>
   <p><em>Click the image above to watch the demo</em></p>
@@ -109,9 +109,9 @@ bash ./deploy.sh
 
 This application was developed by:
 
-- <a href="https://www.linkedin.com/in/shawnneill24/" target="_blank">Shawn Neill</a>
-- <a href="https://www.linkedin.com/in/shakthiarun22/" target="_blank">Lahari Shakthi Arun</a>
-- <a href="https://www.linkedin.com/in/jennnyen/" target="_blank">Jenny Nguyen</a>
+- <a href="https://www.linkedin.com/in/shawnneill24/" target="_blank" rel="noopener noreferrer">Shawn Neill</a>
+- <a href="https://www.linkedin.com/in/shakthiarun22/" target="_blank" rel="noopener noreferrer">Lahari Shakthi Arun</a>
+- <a href="https://www.linkedin.com/in/jennnyen/" target="_blank" rel="noopener noreferrer">Jenny Nguyen</a>
 
 Built for The Beam at the ASU Walter Cronkite School of Journalism and Mass Communication.
 
