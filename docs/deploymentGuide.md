@@ -53,7 +53,7 @@ npm install
 Create `cdk/.env`:
 
 ```bash
-YOUTUBE_API_KEY=AIzaSy-your-youtube-api-key
+YOUTUBE_API_KEY=your-youtube-api-key
 ```
 
 ---
@@ -145,10 +145,12 @@ Visit `http://localhost:3000` for the public chatbot and `http://localhost:3000/
 
 ```bash
 npm run build
-npm start
 ```
 
-Or deploy to Vercel, Amplify, or any Next.js-compatible hosting.
+1. Go to the out folder created and zip all the contents INSIDE the out folder (do NOT zip the out folder itself)
+2. Then go to Amplify in the AWS console and click 'Create new app'
+3. Click 'Deploy without Git' and then 'Next'
+4. Name the app, click 'Choose .zip folder', select the .zip folder from earlier, and click 'Save and deploy'
 
 ---
 

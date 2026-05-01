@@ -7,7 +7,7 @@ An AI-powered platform that helps journalists and citizens understand what happe
 Watch the complete demonstration of The Beam School Board AI:
 
 <div align="center">
-  <a href="https://www.youtube.com/watch?v=yYmPD45WhIM" target="_blank" rel="noopener noreferrer">
+  <a href="https://www.youtube.com/watch?v=ssxqwDAJtiY" target="_blank" rel="noopener noreferrer">
     <img src="./docs/media/demo-thumbnail.png" alt="The Beam School Board AI Demo" width="650">
   </a>
   <p><em>Click the image above to watch the demo</em></p>
