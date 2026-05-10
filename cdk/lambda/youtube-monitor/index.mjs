@@ -1,17 +1,33 @@
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, QueryCommand, PutCommand } from '@aws-sdk/lib-dynamodb';
+import { DynamoDBDocumentClient, QueryCommand, PutCommand, DeleteCommand } from '@aws-sdk/lib-dynamodb';
+import { SecretsManagerClient, GetSecretValueCommand } from '@aws-sdk/client-secrets-manager';
 import { DISTRICTS } from './districts.mjs';
 
 const region = process.env.AWS_REGION ?? 'us-east-1';
 const ddbClient = new DynamoDBClient({ region });
 const ddb = DynamoDBDocumentClient.from(ddbClient);
+const secretsClient = new SecretsManagerClient({ region });
 
 const TRANSCRIPTS_TABLE = process.env.TRANSCRIPTS_TABLE;
 const DISTRICTS_TABLE = process.env.DISTRICTS_TABLE;
-const YOUTUBE_API_KEY = process.env.YOUTUBE_API_KEY;
+const YOUTUBE_API_KEY_SECRET = process.env.YOUTUBE_API_KEY_SECRET ?? 'schoolbot/youtube-api-key';
 const MAX_RESULTS = 3;
 
 const YT_API = 'https://www.googleapis.com/youtube/v3';
+
+// Cache the API key across invocations
+let _youtubeApiKey = null;
+let YOUTUBE_API_KEY = '';
+
+async function getYouTubeApiKey() {
+  if (_youtubeApiKey) return _youtubeApiKey;
+  const resp = await secretsClient.send(
+    new GetSecretValueCommand({ SecretId: YOUTUBE_API_KEY_SECRET }),
+  );
+  _youtubeApiKey = resp.SecretString;
+  YOUTUBE_API_KEY = _youtubeApiKey;
+  return _youtubeApiKey;
+}
 
 // ── Resolve YouTube URL → uploads playlist ID ────────────────────────────────
 // Every channel has a hidden "uploads" playlist: channel UC... → playlist UU...
@@ -150,8 +166,9 @@ async function getExistingVideos(districtId) {
 // ── Handler ───────────────────────────────────────────────────────────────────
 
 export async function handler() {
+  await getYouTubeApiKey();
   if (!YOUTUBE_API_KEY) {
-    throw new Error('YOUTUBE_API_KEY environment variable is not set');
+    throw new Error('YouTube API key not found in Secrets Manager');
   }
 
   // Seed districts table with the hardcoded list (idempotent)
@@ -228,6 +245,28 @@ export async function handler() {
         } catch (err) {
           if (err.name !== 'ConditionalCheckFailedException') throw err;
         }
+      }
+
+      // Clean up: keep only the 3 most recent discovered videos per district
+      const allItems = await ddb.send(
+        new QueryCommand({
+          TableName: TRANSCRIPTS_TABLE,
+          KeyConditionExpression: 'districtId = :d',
+          ExpressionAttributeValues: { ':d': districtId },
+        }),
+      );
+      const discoveredItems = (allItems.Items ?? [])
+        .filter((i) => i.status === 'discovered')
+        .sort((a, b) => (b.publishedAt ?? '').localeCompare(a.publishedAt ?? ''));
+
+      // Delete anything beyond the top 3
+      for (const old of discoveredItems.slice(MAX_RESULTS)) {
+        await ddb.send(
+          new DeleteCommand({
+            TableName: TRANSCRIPTS_TABLE,
+            Key: { districtId, videoId: old.videoId },
+          }),
+        );
       }
 
       results.push({ districtId, total: videos.length, new: readyVideos.length });

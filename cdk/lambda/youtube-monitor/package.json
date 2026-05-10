@@ -5,6 +5,7 @@
   "main": "index.mjs",
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3",
+    "@aws-sdk/client-secrets-manager": "^3",
     "@aws-sdk/lib-dynamodb": "^3"
   }
 }

@@ -245,6 +245,7 @@ interface AnalyticsData {
 function AnalyticsTab({ getAuthHeaders }: { getAuthHeaders: () => Record<string, string> }) {
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [dayRange, setDayRange] = useState(30);
 
   useEffect(() => {
     fetch(`${API_URL}/admin/analytics`, { headers: getAuthHeaders() })
@@ -258,7 +259,6 @@ function AnalyticsTab({ getAuthHeaders }: { getAuthHeaders: () => Record<string,
   if (!data) return <p className="text-sm" style={{ color: "#f87171" }}>Failed to load analytics.</p>;
 
   const cardStyle = { background: "var(--bg-card)", borderColor: "var(--border-subtle)" };
-  const maxDailyCount = Math.max(...data.dailyTrend.map((d) => d.count), 1);
 
   return (
     <div className="space-y-6">
@@ -278,36 +278,77 @@ function AnalyticsTab({ getAuthHeaders }: { getAuthHeaders: () => Record<string,
       </div>
 
       {/* Daily trend */}
-      {data.dailyTrend.length > 0 && (
+      {(() => {
+        // Build full date range with zeros for missing days
+        const now = new Date();
+        const days: { date: string; count: number }[] = [];
+        for (let i = dayRange - 1; i >= 0; i--) {
+          const d = new Date(now);
+          d.setDate(d.getDate() - i);
+          days.push({ date: d.toISOString().split('T')[0], count: 0 });
+        }
+        // Fill in actual counts
+        const countMap = new Map(data.dailyTrend.map((d) => [d.date, d.count]));
+        for (const day of days) {
+          day.count = countMap.get(day.date) ?? 0;
+        }
+        const maxCount = Math.max(...days.map((d) => d.count), 1);
+
+        return (
         <div className="rounded-xl border p-4" style={cardStyle}>
-          <h3 className="text-sm font-semibold mb-3" style={{ color: "var(--text-primary)" }}>
-            Queries Per Day
-          </h3>
-          <div className="flex items-end gap-1 h-32">
-            {data.dailyTrend.map((d) => (
-              <div key={d.date} className="flex-1 flex flex-col items-center gap-1">
-                <div
-                  className="w-full rounded-t"
+          <div className="flex justify-between items-center mb-3">
+            <h3 className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
+              Queries Per Day
+            </h3>
+            <div className="flex gap-1">
+              {[30, 60, 90].map((d) => (
+                <button
+                  key={d}
+                  onClick={() => setDayRange(d)}
+                  className="px-2 py-0.5 rounded text-xs"
                   style={{
-                    height: `${(d.count / maxDailyCount) * 100}%`,
-                    minHeight: d.count > 0 ? "4px" : "0",
-                    background: "var(--asu-maroon)",
+                    background: dayRange === d ? "var(--asu-maroon)" : "transparent",
+                    color: dayRange === d ? "white" : "var(--text-muted)",
+                    border: dayRange === d ? "none" : "1px solid var(--border-subtle)",
                   }}
-                  title={`${d.date}: ${d.count} queries`}
+                >
+                  {d}d
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="flex items-end gap-px h-32">
+            {days.map((d) => (
+              <div key={d.date} className="flex-1 flex flex-col items-center justify-end h-full group relative">
+                <div
+                  className="w-full rounded-sm"
+                  style={{
+                    height: d.count > 0 ? `${Math.max((d.count / maxCount) * 100, 6)}%` : "2px",
+                    background: d.count > 0 ? "var(--asu-maroon)" : "var(--border-subtle)",
+                    opacity: d.count > 0 ? 1 : 0.3,
+                  }}
                 />
+                {/* Tooltip on hover */}
+                <div
+                  className="absolute bottom-full mb-1 px-1.5 py-0.5 rounded text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity"
+                  style={{ background: "#333", color: "#fff" }}
+                >
+                  {d.date}: {d.count}
+                </div>
               </div>
             ))}
           </div>
           <div className="flex justify-between mt-1">
             <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-              {data.dailyTrend[0]?.date}
+              {days[0]?.date}
             </span>
             <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-              {data.dailyTrend[data.dailyTrend.length - 1]?.date}
+              {days[days.length - 1]?.date}
             </span>
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {/* Top districts */}
       {data.topDistricts.length > 0 && (

@@ -86,7 +86,7 @@ export AWS_REGION=us-west-2
 2. **Clone the repository**
 
 ```bash
-git clone https://github.com/ASUCICREPO/schoolbot.git
+git clone https://github.com/ASUCICREPO/schoolboard-chatbot.git
 cd schoolbot
 ```
 

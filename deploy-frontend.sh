@@ -3,7 +3,15 @@ set -e
 
 echo "Deploying frontend to Amplify..."
 
-AWS_REGION=${AWS_REGION:-us-west-2}
+AWS_REGION=${AWS_REGION:-}
+if [ -z "$AWS_REGION" ]; then
+  printf "AWS Region (e.g. us-west-2, us-east-1): "
+  read AWS_REGION
+  if [ -z "$AWS_REGION" ]; then
+    echo "[ERROR] Region is required."
+    exit 1
+  fi
+fi
 
 # Find the Amplify app
 AMPLIFY_APP_ID=$(aws amplify list-apps --region "$AWS_REGION" --query "apps[?name=='schoolbot-beam'].appId" --output text) || {

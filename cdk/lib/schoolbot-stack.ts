@@ -316,7 +316,7 @@ export class SchoolbotStack extends cdk.Stack {
       environment: {
         TRANSCRIPTS_TABLE: transcriptsTable.tableName,
         DISTRICTS_TABLE: districtsTable.tableName,
-        YOUTUBE_API_KEY: process.env.YOUTUBE_API_KEY ?? '',
+        YOUTUBE_API_KEY_SECRET: 'schoolbot/youtube-api-key',
         AWS_NODEJS_CONNECTION_REUSE_ENABLED: '1',
         NODE_OPTIONS: '--enable-source-maps',
       },
@@ -324,6 +324,12 @@ export class SchoolbotStack extends cdk.Stack {
 
     transcriptsTable.grantReadWriteData(youtubeMonitorFn);
     districtsTable.grantWriteData(youtubeMonitorFn);
+    youtubeMonitorFn.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ['secretsmanager:GetSecretValue'],
+        resources: [`arn:aws:secretsmanager:${this.region}:${this.account}:secret:schoolbot/youtube-api-key*`],
+      }),
+    );
 
     // Set the monitor function name on the admin API (forward reference)
     adminApiFn.addEnvironment('YOUTUBE_MONITOR_FN', youtubeMonitorFn.functionName);

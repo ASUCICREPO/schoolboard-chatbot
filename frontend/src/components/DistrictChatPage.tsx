@@ -225,13 +225,20 @@ export default function DistrictChatPage({ district }: Props) {
           <textarea
             ref={inputRef}
             value={input}
-            onChange={(e) => setInput(e.target.value)}
+            onChange={(e) => {
+              if (e.target.value.length <= 2000) setInput(e.target.value);
+              // Auto-expand height
+              e.target.style.height = 'auto';
+              e.target.style.height = Math.min(e.target.scrollHeight, 160) + 'px';
+            }}
             onKeyDown={handleKeyDown}
             placeholder={`Ask about ${district.name} meetings…`}
+            maxLength={2000}
             rows={1}
-            className="flex-1 resize-none rounded-xl px-4 py-2.5 text-sm outline-none transition-all max-h-32 overflow-y-auto"
+            className="flex-1 resize-none rounded-xl px-4 py-2.5 text-sm outline-none transition-all overflow-y-auto"
             style={{
               minHeight: "42px",
+              maxHeight: "160px",
               background: "var(--bg-card)",
               border: "1px solid var(--border-subtle)",
               color: "var(--text-primary)",
@@ -251,9 +258,16 @@ export default function DistrictChatPage({ district }: Props) {
             Send
           </button>
         </div>
-        <p className="mt-1.5 text-xs text-center max-w-3xl mx-auto" style={{ color: "#444" }}>
-          Answers are based on meeting transcripts and may not be complete.
-        </p>
+        <div className="flex justify-between items-center mt-1.5 max-w-3xl mx-auto">
+          <p className="text-xs" style={{ color: "#444" }}>
+            Answers are based on meeting transcripts and may not be complete.
+          </p>
+          {input.length > 1500 && (
+            <p className="text-xs" style={{ color: input.length >= 2000 ? "#f87171" : "#666" }}>
+              {input.length}/2000
+            </p>
+          )}
+        </div>
       </div>
     </div>
   );

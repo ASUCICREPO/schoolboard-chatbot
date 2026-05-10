@@ -33,29 +33,41 @@ AWS_ACCOUNT=$(aws sts get-caller-identity --query "Account" --output text 2>/dev
   echo "ERROR: AWS credentials not configured. Run:"
   echo "   aws sso login --profile your-profile"
   echo "   export AWS_PROFILE=your-profile"
+  echo "   export AWS_REGION=your-region"
   exit 1
 }
-AWS_REGION=${AWS_REGION:-us-west-2}
+AWS_REGION=${AWS_REGION:-}
+if [ -z "$AWS_REGION" ]; then
+  printf "AWS Region (e.g. us-west-2, us-east-1): "
+  read AWS_REGION
+  if [ -z "$AWS_REGION" ]; then
+    echo "[ERROR] Region is required."
+    exit 1
+  fi
+  export AWS_REGION
+fi
 echo "[OK] AWS Account: $AWS_ACCOUNT"
 echo "[OK] AWS Region:  $AWS_REGION"
 echo ""
 
-# ── Check for YouTube API key ────────────────────────────────────────────────
+# ── Check for YouTube API key in Secrets Manager ─────────────────────────────
 
-if [ ! -f cdk/.env ]; then
-  echo "No cdk/.env file found."
+echo "Checking YouTube API key..."
+aws secretsmanager describe-secret --secret-id "schoolbot/youtube-api-key" --region "$AWS_REGION" >/dev/null 2>&1 || {
+  echo "No YouTube API key found in Secrets Manager."
   printf "Enter your YouTube Data API v3 key (or press Enter to skip): "
   read YT_KEY
   if [ -n "$YT_KEY" ]; then
-    printf "YOUTUBE_API_KEY=%s\n" "$YT_KEY" > cdk/.env
-    echo "[OK] Saved YouTube API key to cdk/.env"
+    aws secretsmanager create-secret \
+      --name "schoolbot/youtube-api-key" \
+      --description "YouTube Data API v3 key for SchoolBot channel monitoring" \
+      --secret-string "$YT_KEY" \
+      --region "$AWS_REGION" >/dev/null 2>&1
+    echo "[OK] YouTube API key stored in Secrets Manager"
   else
-    printf "YOUTUBE_API_KEY=\n" > cdk/.env
-    echo "[WARN] YouTube monitoring will not work without an API key"
+    echo "[WARN] YouTube channel monitoring will not work without an API key"
   fi
-else
-  echo "[OK] cdk/.env exists"
-fi
+}
 echo ""
 
 # ── Install CDK dependencies ─────────────────────────────────────────────────
@@ -128,7 +140,14 @@ if [ "$CREATE_ADMIN" = "y" ] || [ "$CREATE_ADMIN" = "Y" ]; then
     --username "$ADMIN_USER" \
     --password "$ADMIN_PASS" \
     --permanent \
-    --region "$AWS_REGION" >/dev/null 2>&1
+    --region "$AWS_REGION" 2>&1 || {
+    echo ""
+    echo "[ERROR] Password does not meet requirements."
+    echo "  Must be at least 8 characters with uppercase, lowercase, and a number."
+    echo "  Please set the password manually:"
+    echo "  aws cognito-idp admin-set-user-password --user-pool-id $USER_POOL_ID --username $ADMIN_USER --password YOUR_PASSWORD --permanent --region $AWS_REGION"
+    echo ""
+  }
 
   echo "[OK] Admin user '$ADMIN_USER' created"
 else
@@ -255,6 +274,9 @@ echo "============================================"
 echo "  Deployment Complete!"
 echo "============================================"
 echo ""
+echo "  To redeploy frontend only:"
+echo "    bash deploy-frontend.sh"
+echo ""
 echo "  API:       $API_URL"
 echo "  Frontend:  $AMPLIFY_URL"
 echo "  Admin:     ${AMPLIFY_URL}/admin"
@@ -263,7 +285,4 @@ echo "  Next steps:"
 echo "  1. Visit ${AMPLIFY_URL}"
 echo "  2. Log in to Admin and click 'Scan YouTube Channels'"
 echo "  3. Upload transcripts for discovered videos"
-echo ""
-echo "  To redeploy frontend only:"
-echo "    bash deploy-frontend.sh"
 echo ""
