@@ -1,0 +1,26 @@
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Action": [
+                "cloudformation:*",
+                "s3:*",
+                "s3vectors:*",
+                "dynamodb:*",
+                "lambda:*",
+                "iam:*",
+                "cognito-idp:*",
+                "bedrock:*",
+                "logs:*",
+                "secretsmanager:*",
+                "transcribe:*",
+                "amplify:*",
+                "sts:*",
+                "apigateway:*",
+                "events:*"
+            ],
+            "Resource": "*"
+        }
+    ]
+}

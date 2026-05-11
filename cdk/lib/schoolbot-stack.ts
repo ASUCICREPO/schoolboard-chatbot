@@ -34,7 +34,7 @@ export class SchoolbotStack extends cdk.Stack {
     const districtsTable = new dynamodb.Table(this, 'DistrictsTable', {
       partitionKey: { name: 'districtId', type: dynamodb.AttributeType.STRING },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
-      removalPolicy: cdk.RemovalPolicy.DESTROY,
+      removalPolicy: cdk.RemovalPolicy.RETAIN,
     });
 
     const transcriptsTable = new dynamodb.Table(this, 'TranscriptsTable', {
@@ -47,7 +47,7 @@ export class SchoolbotStack extends cdk.Stack {
     const queryLogsTable = new dynamodb.Table(this, 'QueryLogsTable', {
       partitionKey: { name: 'logId', type: dynamodb.AttributeType.STRING },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
-      removalPolicy: cdk.RemovalPolicy.DESTROY,
+      removalPolicy: cdk.RemovalPolicy.RETAIN,
     });
 
     // ── S3 Vector Store (vector bucket + index for Bedrock KB) ───────────────
@@ -170,7 +170,6 @@ export class SchoolbotStack extends cdk.Stack {
 
     // ── Cognito User Pool (admin authentication) ───────────────────────────────
     const userPool = new cognito.UserPool(this, 'AdminUserPool', {
-      userPoolName: 'schoolbot-admin-pool',
       selfSignUpEnabled: false, // Admins added manually in console
       signInAliases: { username: true, email: true },
       passwordPolicy: {
@@ -184,7 +183,6 @@ export class SchoolbotStack extends cdk.Stack {
     });
 
     const userPoolClient = userPool.addClient('AdminAppClient', {
-      userPoolClientName: 'schoolbot-admin-app',
       authFlows: {
         userPassword: true,
         userSrp: true,
