@@ -28,6 +28,7 @@ The Beam is a fully serverless application built on AWS. It consists of four mai
 | **EventBridge** | 6-hour schedule for YouTube channel polling |
 | **Transcribe** | Speech-to-text for uploaded audio/video files |
 | **CloudWatch** | Lambda logs with 2-week retention |
+| **SecretsManager** | Stores Youtube API key |
 | **CDK** | Infrastructure as code |
 
 ---

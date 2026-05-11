@@ -79,6 +79,14 @@ The YouTube API quota allows ~70 runs per day (10,000 units / ~144 units per run
 
 ---
 
+## Updating list of schools permanently through deployments
+
+Edit `cdk/lambda/districts.mjs`:
+
+Add to the list of schools following the same format.
+
+---
+
 ## Adding a New API Endpoint
 
 1. **Add the handler function** in `cdk/lambda/admin-api/index.mjs`:

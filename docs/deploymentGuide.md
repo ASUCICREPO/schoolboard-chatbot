@@ -2,8 +2,7 @@
 
 Step-by-step instructions for deploying The Beam School Board AI platform.
 
----
-
+ 
 ## Prerequisites
 
 | Requirement | Version | Purpose |
@@ -36,9 +35,8 @@ Both must be enabled in your deployment region (default: `us-west-2`).
 4. Create an API key under APIs & Services → Credentials
 5. Copy the key
 
----
-
-## Step 1: Clone and Install
+ 
+## Clone and Install
 
 ```bash
 git clone https://github.com/your-org/schoolbot.git
@@ -46,27 +44,62 @@ cd schoolbot/cdk
 npm install
 ```
 
----
-
-## Step 2: Configure Environment
-
-Create `cdk/.env`:
+## Store YouTube API Key in Secrets Manager
 
 ```bash
-YOUTUBE_API_KEY=your-youtube-api-key
+aws secretsmanager create-secret \
+  --name "schoolbot/youtube-api-key" \
+  --description "YouTube Data API v3 key for channel monitoring" \
+  --secret-string "YOUR_YOUTUBE_API_KEY" \
+  --region us-west-2
 ```
 
----
-
-## Step 3: Bootstrap CDK (First Time Only)
+To update an existing key:
 
 ```bash
-cdk bootstrap aws://<ACCOUNT_ID>/us-west-2
+aws secretsmanager put-secret-value \
+  --secret-id "schoolbot/youtube-api-key" \
+  --secret-string "YOUR_NEW_API_KEY" \
+  --region us-west-2
 ```
 
----
+> **Note**: The deploy script (`deploy.sh`) handles this automatically if the secret doesn't exist yet.
 
-## Step 4: Deploy the Stack
+ 
+# Quick Start
+
+1. **Configure AWS credentials**
+
+```bash
+# For AWS SSO (recommended)
+aws sso login --profile your-profile-name
+export AWS_PROFILE=your-profile-name
+export AWS_REGION=us-west-2
+```
+
+2. **Clone the repository**
+
+```bash
+git clone https://github.com/ASUCICREPO/schoolboard-chatbot.git
+cd schoolbot
+```
+
+3. **Run the deployment script**
+
+```bash
+bash ./deploy.sh
+```
+
+# Manual Deploymnet Guide
+ 
+## Step 1: Bootstrap CDK (First Time Only)
+
+```bash
+cdk bootstrap aws://<ACCOUNT_ID>/<ACCOUNT_REGION>
+```
+
+ 
+## Step 2: Deploy the Stack
 
 ```bash
 cdk deploy
@@ -90,9 +123,8 @@ The deployment creates:
 
 **Save the outputs** — you'll need `ApiUrl`, `UserPoolId`, and `UserPoolClientId`.
 
----
-
-## Step 5: Create an Admin User
+ 
+## Step 3: Create an Admin User
 
 ```bash
 # Create user with temporary password
@@ -102,17 +134,16 @@ aws cognito-idp admin-create-user \
   --temporary-password "TempPass123!" \
   --message-action SUPPRESS
 
-# Set permanent password (avoids forced password change)
+# Set permanent password (make sure its at least 8 characters and contains an uppercase, lowercase, and number)
 aws cognito-idp admin-set-user-password \
   --user-pool-id <UserPoolId> \
   --username admin \
-  --password "YourSecurePassword123!" \
+  --password "<PASSWORD>" \
   --permanent
 ```
 
----
-
-## Step 6: Configure the Frontend
+ 
+## Step 4: Configure the Frontend
 
 ```bash
 cd ../frontend
@@ -129,9 +160,8 @@ NEXT_PUBLIC_COGNITO_CLIENT_ID=xxxxxxxxxxxxxxxxxxxxxxxxxx
 
 Use the values from the CDK deploy output.
 
----
-
-## Step 7: Run the Frontend
+ 
+## Step 5: Run the Frontend
 
 ### Development
 
@@ -152,9 +182,8 @@ npm run build
 3. Click 'Deploy without Git' and then 'Next'
 4. Name the app, click 'Choose .zip folder', select the .zip folder from earlier, and click 'Save and deploy'
 
----
-
-## Step 8: Initial Setup
+ 
+## Step 6: Initial Setup
 
 1. Log in to the admin dashboard at `/admin`
 2. Go to the **Districts** tab — districts are auto-populated when you run a YouTube scan
@@ -162,8 +191,7 @@ npm run build
 4. Upload transcripts for discovered videos
 5. Verify the chatbot works by asking a question on a district page
 
----
-
+ 
 ## Updating the Deployment
 
 After making code changes:
@@ -175,8 +203,7 @@ cdk deploy
 
 CDK automatically detects changed Lambda code and updates only what's needed.
 
----
-
+ 
 ## Destroying the Stack
 
 To remove all AWS resources:
@@ -185,23 +212,19 @@ To remove all AWS resources:
 cdk destroy
 ```
 
-DynamoDB tables with `removalPolicy: RETAIN` will survive the destroy. Delete them manually if needed:
+> **Note**: The YouTube API key in Secrets Manager is not deleted by `cdk destroy`. Delete it manually if needed:
+> ```bash
+> aws secretsmanager delete-secret --secret-id "schoolbot/youtube-api-key" --force-delete-without-recovery --region us-west-2
+> ```
 
-```bash
-aws dynamodb delete-table --table-name schoolbot-districts
-aws dynamodb delete-table --table-name schoolbot-transcripts
-aws dynamodb delete-table --table-name schoolbot-query-logs
-```
+ 
+## Secrets & Environment Variables Reference
 
----
+### AWS Secrets Manager
 
-## Environment Variables Reference
-
-### CDK (`cdk/.env`)
-
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `YOUTUBE_API_KEY` | Yes | YouTube Data API v3 key |
+| Secret Name | Description |
+|-------------|-------------|
+| `schoolbot/youtube-api-key` | YouTube Data API v3 key for channel monitoring |
 
 ### Frontend (`frontend/.env`)
 

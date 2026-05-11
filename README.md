@@ -44,6 +44,7 @@ All work produced is open source. More information can be found in the GitHub re
 | Overview              | [Overview](#overview)                                 |
 | Architecture          | [Architecture](#architecture-diagram)                 |
 | Quick Start           | [Quick Start](#quick-start)                           |
+| Quick Start           | [Quick Start](#quick-start)                           |
 | Documentation         | [Documentation](#documentation)                       |
 | Credits               | [Credits](#credits)                                   |
 | License               | [License](#license)                                   |
@@ -71,6 +72,38 @@ This application combines AI-powered conversational intelligence with school boa
 - **Backend**: AWS CDK deployable infrastructure — API Gateway, Lambda, Bedrock Knowledge Base, DynamoDB, S3, Transcribe
 
 For a detailed deep dive into the architecture, including component interactions, data flow, DynamoDB schemas, and cost analysis, see [docs/architectureDeepDive.md](docs/architectureDeepDive.md).
+
+## Prerequisites
+
+| Requirement | Version | Purpose |
+|-------------|---------|---------|
+| Node.js | 20+ | Lambda runtime and frontend |
+| AWS CLI | 2.x | AWS resource management |
+| AWS CDK | 2.x | Infrastructure deployment |
+| AWS Account | — | With Bedrock model access enabled |
+| YouTube Data API v3 Key | — | Channel monitoring |
+
+### Install CDK
+
+```bash
+npm install -g aws-cdk
+```
+
+### Enable Bedrock Models
+
+In the AWS Console, navigate to **Bedrock → Model access** and enable:
+- Amazon Titan Embed Text v2
+- Anthropic Claude Haiku 4.5
+
+Both must be enabled in your deployment region (default: `us-west-2`).
+
+### Get a YouTube API Key
+
+1. Go to [Google Cloud Console](https://console.cloud.google.com)
+2. Create a project (or select existing)
+3. Enable **YouTube Data API v3** under APIs & Services → Library
+4. Create an API key under APIs & Services → Credentials
+5. Copy the key
 
 ## Quick Start
 

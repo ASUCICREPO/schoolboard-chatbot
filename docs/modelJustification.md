@@ -22,14 +22,6 @@ Rationale for AI model selection in The Beam School Board AI.
 - **Cost** — Significantly cheaper than third-party embedding models for the volume of documents we process
 - **Latency** — Low latency for real-time vector search queries
 
-### Alternatives Considered
-
-| Model | Reason Not Selected |
-|-------|-------------------|
-| OpenAI text-embedding-3 | Requires external API calls, adds latency and cost |
-| Cohere Embed v3 | Available on Bedrock but Titan has better S3 Vectors integration |
-| Custom fine-tuned | Unnecessary — meeting transcripts are standard English text |
-
 ### Configuration
 
 - **Dimensions**: 1024
@@ -49,17 +41,6 @@ The 512-token chunk size was chosen because board meeting transcripts contain lo
 - **Quality** — Despite being the smallest Claude model, Haiku handles factual Q&A from provided context very well
 - **Instruction following** — Reliably follows the system prompt to only answer from provided transcripts and cite sources
 - **Cross-region inference** — Available via `us.anthropic.claude-haiku-4-5-20251001-v1:0` inference profile for better availability
-
-### Alternatives Considered
-
-| Model | Reason Not Selected |
-|-------|-------------------|
-| Claude Sonnet 3.5/4 | 5-10x more expensive per query, slower response times. Overkill for extractive Q&A from provided context |
-| Claude Opus | 20x+ cost, much slower. Designed for complex reasoning, not needed here |
-| GPT-4o | Requires OpenAI API integration, not native to Bedrock KB |
-| GPT-4o-mini | Similar cost/speed to Haiku but requires external API |
-| Llama 3 | Available on Bedrock but weaker instruction following for RAG tasks |
-| Amazon Titan Text | Weaker at nuanced Q&A and citation generation compared to Claude |
 
 ### Why Not a Larger Model?
 
@@ -99,35 +80,6 @@ Since S3 Vectors doesn't support metadata filtering, district scoping is achieve
 3. **System prompt** — Instructs the model to only use transcripts from the specified district
 
 This approach works because the embedding model captures the district identifier in the vector representation, so vector similarity naturally ranks same-district chunks higher.
-
----
-
-## Cost Projections
-
-### Per-Query Cost
-
-| Component | Cost |
-|-----------|------|
-| Titan Embed (query embedding) | ~$0.0001 |
-| S3 Vectors search | ~$0.0001 |
-| Claude Haiku generation | ~$0.001 |
-| **Total per query** | **~$0.0012** |
-
-### Monthly Estimates
-
-| Usage Level | Queries/Month | Monthly Cost |
-|-------------|---------------|--------------|
-| Low (testing) | 100 | ~$0.12 |
-| Medium (internal use) | 1,000 | ~$1.20 |
-| High (public launch) | 10,000 | ~$12.00 |
-
-### Transcript Processing Cost
-
-| Method | Cost |
-|--------|------|
-| Manual text paste | Free |
-| AWS Transcribe (2-hour meeting) | ~$2.88 |
-| KB ingestion (per sync) | ~$0.01 |
 
 ---
 
