@@ -270,26 +270,25 @@ if [ -n "$GITHUB_TOKEN" ] && [ -n "$GITHUB_REPO_URL" ]; then
       --repository "$GITHUB_REPO_URL" \
       --access-token "$GITHUB_TOKEN" \
       --build-spec "version: 1
+appRoot: frontend
 frontend:
   phases:
     preBuild:
       commands:
-        - cd frontend
         - npm ci
     build:
       commands:
-        - cd frontend
         - echo \"NEXT_PUBLIC_API_URL=${API_URL}\" > .env
         - echo \"NEXT_PUBLIC_COGNITO_USER_POOL_ID=${USER_POOL_ID}\" >> .env
         - echo \"NEXT_PUBLIC_COGNITO_CLIENT_ID=${CLIENT_ID}\" >> .env
         - npm run build
   artifacts:
-    baseDirectory: frontend/out
+    baseDirectory: out
     files:
       - '**/*'
   cache:
     paths:
-      - frontend/node_modules/**/*" \
+      - node_modules/**/*" \
       --environment-variables "NEXT_PUBLIC_API_URL=${API_URL},NEXT_PUBLIC_COGNITO_USER_POOL_ID=${USER_POOL_ID},NEXT_PUBLIC_COGNITO_CLIENT_ID=${CLIENT_ID}" \
       --region "$AWS_REGION" \
       --query "app.appId" \

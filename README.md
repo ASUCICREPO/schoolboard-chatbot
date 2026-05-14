@@ -122,14 +122,14 @@ Both must be enabled in your deployment region (default: `us-west-2`).
 # For AWS SSO (recommended)
 aws sso login --profile your-profile-name
 export AWS_PROFILE=your-profile-name
-export AWS_REGION=us-west-2
+export AWS_REGION=your-region
 ```
 
 2. **Clone the repository**
 
 ```bash
 git clone https://github.com/ASUCICREPO/schoolboard-chatbot.git
-cd schoolbot
+cd schoolboard-chatbot
 ```
 
 3. **Run the deployment script**

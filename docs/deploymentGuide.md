@@ -43,23 +43,15 @@ Both must be enabled in your deployment region (default: `us-west-2`).
 4. Select scopes `repo` & `admin:repo_hook`
 5. Click Generate token
 6. Copy the token
- 
-## Clone and Install
 
-```bash
-git clone https://github.com/your-org/schoolbot.git
-cd schoolbot/cdk
-npm install
-```
-
-## Store YouTube API Key in Secrets Manager
+### Store YouTube API Key in Secrets Manager
 
 ```bash
 aws secretsmanager create-secret \
   --name "schoolbot/youtube-api-key" \
   --description "YouTube Data API v3 key for channel monitoring" \
   --secret-string "YOUR_YOUTUBE_API_KEY" \
-  --region us-west-2
+  --region YOUR_REGION
 ```
 
 To update an existing key:
@@ -68,7 +60,26 @@ To update an existing key:
 aws secretsmanager put-secret-value \
   --secret-id "schoolbot/youtube-api-key" \
   --secret-string "YOUR_NEW_API_KEY" \
-  --region us-west-2
+  --region YOUR_REGION
+```
+
+### Store GitHub Personal access token in Secrets Manager
+
+```bash
+aws secretsmanager create-secret \
+  --name "schoolbot/github-token" \
+  --description "GitHub PAT for Amplify to pull and build the frontend" \
+  --secret-string "YOUR_GITHUB_TOKEN" \
+  --region YOUR_REGION
+```
+
+To update an existing token:
+
+```bash
+aws secretsmanager put-secret-value \
+  --secret-id "schoolbot/github-token" \
+  --secret-string "YOUR_NEW_TOKEN" \
+  --region YOUR_REGION
 ```
 
 > **Note**: The deploy script (`deploy.sh`) handles this automatically if the secret doesn't exist yet.
@@ -82,14 +93,14 @@ aws secretsmanager put-secret-value \
 # For AWS SSO (recommended)
 aws sso login --profile your-profile-name
 export AWS_PROFILE=your-profile-name
-export AWS_REGION=us-west-2
+export AWS_REGION=your-region
 ```
 
 2. **Clone the repository**
 
 ```bash
 git clone https://github.com/ASUCICREPO/schoolboard-chatbot.git
-cd schoolbot
+cd schoolboard-chatbot
 ```
 
 3. **Run the deployment script**
@@ -161,8 +172,8 @@ npm install
 Create `frontend/.env`:
 
 ```
-NEXT_PUBLIC_API_URL=https://<api-id>.execute-api.us-west-2.amazonaws.com/prod
-NEXT_PUBLIC_COGNITO_USER_POOL_ID=us-west-2_XXXXXXXXX
+NEXT_PUBLIC_API_URL=https://<api-id>.execute-api.<your-region>.amazonaws.com/prod
+NEXT_PUBLIC_COGNITO_USER_POOL_ID=<your-region>_XXXXXXXXX
 NEXT_PUBLIC_COGNITO_CLIENT_ID=xxxxxxxxxxxxxxxxxxxxxxxxxx
 ```
 
@@ -222,7 +233,7 @@ cdk destroy
 
 > **Note**: The YouTube API key in Secrets Manager is not deleted by `cdk destroy`. Delete it manually if needed:
 > ```bash
-> aws secretsmanager delete-secret --secret-id "schoolbot/youtube-api-key" --force-delete-without-recovery --region us-west-2
+> aws secretsmanager delete-secret --secret-id "schoolbot/youtube-api-key" --force-delete-without-recovery --region your-region
 > ```
 
  
