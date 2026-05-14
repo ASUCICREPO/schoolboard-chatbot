@@ -108,7 +108,7 @@ echo ""
 
 echo "Installing CDK dependencies..."
 cd cdk
-npm install --prefer-offline --no-audit --no-fund 2>&1 | tail -1
+npm install
 echo "[OK] CDK dependencies installed"
 echo ""
 
@@ -207,7 +207,7 @@ echo ""
 
 echo "Building and deploying frontend to Amplify..."
 cd frontend
-npm install --prefer-offline --no-audit --no-fund 2>&1 | tail -1
+npm install
 
 # Write env file with CDK outputs
 cat > .env <<EOF
