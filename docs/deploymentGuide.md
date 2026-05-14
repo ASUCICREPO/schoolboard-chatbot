@@ -35,6 +35,14 @@ Both must be enabled in your deployment region (default: `us-west-2`).
 4. Create an API key under APIs & Services → Credentials
 5. Copy the key
 
+### Get a GitHub Personal Access Token
+
+1. Go to developer settings [Personal access tokens (classic)](https://github.com/settings/tokens)
+2. Click Generate a new token (classic)
+3. Name it in the Note section
+4. Select scopes `repo` & `admin:repo_hook`
+5. Click Generate token
+6. Copy the token
  
 ## Clone and Install
 
@@ -225,6 +233,7 @@ cdk destroy
 | Secret Name | Description |
 |-------------|-------------|
 | `schoolbot/youtube-api-key` | YouTube Data API v3 key for channel monitoring |
+| `schoolbot/github-token` | GitHub personal access token with repo and admin:repo_hook scopes |
 
 ### Frontend (`frontend/.env`)
 
