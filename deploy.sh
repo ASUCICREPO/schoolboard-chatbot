@@ -8,21 +8,6 @@ echo "  (AWS CloudShell Edition)"
 echo "============================================"
 echo ""
 
-# ── CloudShell Environment Notes ─────────────────────────────────────────────
-# CloudShell provides:
-#   - AWS CLI v2 (pre-authenticated with console credentials)
-#   - Node.js (via nvm)
-#   - ~1 GB persistent storage in $HOME
-#   - ~1 GB /tmp (non-persistent)
-#   - git, zip, curl
-#   - No Docker, no sudo for package installs
-#
-# Strategy:
-#   - Deploy backend via CDK (installs only CDK deps, ~200MB)
-#   - Frontend is built REMOTELY by Amplify via GitHub integration
-#   - This avoids the disk space issue of installing Next.js locally
-# ─────────────────────────────────────────────────────────────────────────────
-
 # ── Use /tmp for caches to save persistent storage ───────────────────────────
 
 export npm_config_cache=/tmp/.npm-cache
@@ -63,10 +48,6 @@ AWS_ACCOUNT=$(aws sts get-caller-identity --query "Account" --output text) || {
 
 # CloudShell sets AWS_REGION automatically from the console region
 AWS_REGION=${AWS_REGION:-$(aws configure get region 2>/dev/null || echo "")}
-if [ -z "$AWS_REGION" ]; then
-  # Fallback: try the metadata endpoint (CloudShell-specific)
-  AWS_REGION=$(curl -s http://169.254.169.254/latest/meta-data/placement/region 2>/dev/null || echo "")
-fi
 if [ -z "$AWS_REGION" ]; then
   printf "AWS Region (e.g. us-west-2, us-east-1): "
   read AWS_REGION
