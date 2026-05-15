@@ -11,7 +11,7 @@ const secretsClient = new SecretsManagerClient({ region });
 const TRANSCRIPTS_TABLE = process.env.TRANSCRIPTS_TABLE;
 const DISTRICTS_TABLE = process.env.DISTRICTS_TABLE;
 const YOUTUBE_API_KEY_SECRET = process.env.YOUTUBE_API_KEY_SECRET ?? 'schoolbot/youtube-api-key';
-const MAX_RESULTS = 3;
+const MAX_RESULTS = 5;
 
 const YT_API = 'https://www.googleapis.com/youtube/v3';
 
@@ -29,9 +29,40 @@ async function getYouTubeApiKey() {
   return _youtubeApiKey;
 }
 
+// ── Fetch recent videos containing "board" from a playlist (1 quota unit per page) ──
+
+async function fetchBoardVideos(playlistId) {
+  const matched = [];
+
+  // Fetch one page of 50 most recent videos (1 quota unit) and filter for "board"
+  const resp = await fetch(
+    `${YT_API}/playlistItems?key=${YOUTUBE_API_KEY}&playlistId=${playlistId}&part=snippet&maxResults=50`,
+  );
+  if (!resp.ok) {
+    const err = await resp.text();
+    throw new Error(`YouTube API ${resp.status}: ${err.slice(0, 200)}`);
+  }
+  const data = await resp.json();
+  const items = data.items ?? [];
+
+  for (const item of items) {
+    const title = item.snippet.title ?? '';
+    if (title.toLowerCase().includes('board')) {
+      matched.push({
+        videoId: item.snippet.resourceId?.videoId,
+        title,
+        publishedAt: item.snippet.publishedAt,
+        thumbnail: item.snippet.thumbnails?.medium?.url ?? item.snippet.thumbnails?.default?.url ?? '',
+        description: (item.snippet.description ?? '').slice(0, 200),
+      });
+      if (matched.length >= MAX_RESULTS) break;
+    }
+  }
+
+  return matched.filter((v) => v.videoId);
+}
+
 // ── Resolve YouTube URL → uploads playlist ID ────────────────────────────────
-// Every channel has a hidden "uploads" playlist: channel UC... → playlist UU...
-// Explicit playlist URLs are used directly.
 
 async function resolvePlaylistId(youtubeUrl) {
   const url = new URL(youtubeUrl);
@@ -74,33 +105,6 @@ async function resolvePlaylistId(youtubeUrl) {
   }
 
   return null;
-}
-
-// ── Fetch recent videos from a playlist (1 quota unit) ───────────────────────
-
-async function fetchPlaylistVideos(playlistId) {
-  // Fetch more than MAX_RESULTS to handle playlists where newest isn't first
-  const fetchCount = Math.max(MAX_RESULTS * 3, 10);
-  const resp = await fetch(
-    `${YT_API}/playlistItems?key=${YOUTUBE_API_KEY}&playlistId=${playlistId}&part=snippet&maxResults=${fetchCount}`,
-  );
-  if (!resp.ok) {
-    const err = await resp.text();
-    throw new Error(`YouTube API ${resp.status}: ${err.slice(0, 200)}`);
-  }
-  const data = await resp.json();
-  const videos = (data.items ?? []).map((item) => ({
-    videoId: item.snippet.resourceId?.videoId,
-    title: item.snippet.title,
-    publishedAt: item.snippet.publishedAt,
-    thumbnail: item.snippet.thumbnails?.medium?.url ?? item.snippet.thumbnails?.default?.url ?? '',
-    description: (item.snippet.description ?? '').slice(0, 200),
-  })).filter((v) => v.videoId);
-
-  // Sort by publishedAt descending (newest first) and take top MAX_RESULTS
-  return videos
-    .sort((a, b) => (b.publishedAt ?? '').localeCompare(a.publishedAt ?? ''))
-    .slice(0, MAX_RESULTS);
 }
 
 // ── Filter out upcoming/live videos using videos.list (1 quota unit) ─────────
@@ -212,7 +216,7 @@ export async function handler() {
         continue;
       }
 
-      const videos = await fetchPlaylistVideos(playlistId);
+      const videos = await fetchBoardVideos(playlistId);
       const { ids: existingIds, newestDate } = await getExistingVideos(districtId);
 
       const newVideos = videos.filter((v) => {
@@ -247,7 +251,7 @@ export async function handler() {
         }
       }
 
-      // Clean up: keep only the 3 most recent discovered videos per district
+      // Clean up: keep only the 5 most recent discovered videos per district
       const allItems = await ddb.send(
         new QueryCommand({
           TableName: TRANSCRIPTS_TABLE,
@@ -259,7 +263,7 @@ export async function handler() {
         .filter((i) => i.status === 'discovered')
         .sort((a, b) => (b.publishedAt ?? '').localeCompare(a.publishedAt ?? ''));
 
-      // Delete anything beyond the top 3
+      // Delete anything beyond the top 5
       for (const old of discoveredItems.slice(MAX_RESULTS)) {
         await ddb.send(
           new DeleteCommand({
