@@ -160,6 +160,17 @@ export async function handler(event) {
         }),
       );
 
+      // Tag with districtId (Bedrock KB metadata sidecar) so the chatbot's
+      // district-scoped retrieval filter can find this transcript.
+      await s3.send(
+        new PutObjectCommand({
+          Bucket: TRANSCRIPTS_BUCKET,
+          Key: `${transcriptS3Key}.metadata.json`,
+          Body: JSON.stringify({ metadataAttributes: { districtId } }),
+          ContentType: 'application/json',
+        }),
+      );
+
       await updateTranscriptStatus(districtId, transcriptId, 'completed', {
         s3Key: transcriptS3Key,
         transcriptSource: 'amazon-transcribe',

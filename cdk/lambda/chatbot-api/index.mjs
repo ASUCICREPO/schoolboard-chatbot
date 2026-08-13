@@ -18,9 +18,11 @@ You answer questions about school board meetings based solely on the transcript 
 
 Rules:
 - Always answer using only the provided transcript excerpts
+- You are given multiple excerpts from the same meeting; synthesize across all of them to give a complete answer
 - Be factual and cite specific meeting details (district, date) when possible
 - If the query specifies a district (shown in brackets like [District: xxx]), only use transcripts from that specific district
 - If the information is not in the transcripts, say "I don't have information about that in the available transcripts"
+- Do not add disclaimers that the transcript or excerpt is "limited" or "incomplete" — answer with the substance you have
 - Keep responses concise and relevant
 - Do not refuse to answer questions about public school board meeting content`;
 
@@ -35,6 +37,48 @@ function buildResponse(statusCode, body) {
     },
     body: JSON.stringify(body),
   };
+}
+
+// Bedrock returns this canned string when its managed RAG (especially session-based
+// query reformulation on a follow-up turn) can't ground an answer. The model can often
+// still answer the same question standalone, so we detect it and retry without the session.
+const REFUSAL_PATTERN = /unable to assist|cannot assist|can't assist|i cannot help|i can't help/i;
+
+function buildRagCommand(searchQuery, districtId, sessionId) {
+  return new RetrieveAndGenerateCommand({
+    input: { text: searchQuery },
+    retrieveAndGenerateConfiguration: {
+      type: 'KNOWLEDGE_BASE',
+      knowledgeBaseConfiguration: {
+        knowledgeBaseId: BEDROCK_KB_ID,
+        modelArn: BEDROCK_MODEL_ID.startsWith('arn:')
+          ? BEDROCK_MODEL_ID
+          : BEDROCK_MODEL_ID.match(/^(us\.|eu\.|ap\.|global\.)/)
+            ? `arn:aws:bedrock:${region}:${process.env.AWS_ACCOUNT_ID}:inference-profile/${BEDROCK_MODEL_ID}`
+            : `arn:aws:bedrock:${region}::foundation-model/${BEDROCK_MODEL_ID}`,
+        retrievalConfiguration: {
+          vectorSearchConfiguration: {
+            numberOfResults: 25,
+            // Hard-scope retrieval to the requested district so all chunks come
+            // from that district's transcripts (no cross-district leakage).
+            ...(districtId ? { filter: { equals: { key: 'districtId', value: districtId } } } : {}),
+          },
+        },
+        generationConfiguration: {
+          promptTemplate: {
+            textPromptTemplate: `${SYSTEM_PROMPT}\n\n$search_results$\n\nHuman: $query$\nAssistant:`,
+          },
+          inferenceConfig: {
+            textInferenceConfig: {
+              maxTokens: 1024,
+              temperature: 0.1,
+            },
+          },
+        },
+      },
+    },
+    ...(sessionId ? { sessionId } : {}),
+  });
 }
 
 async function logQuery(query, districtId, answer, sessionId) {
@@ -97,40 +141,21 @@ export async function handler(event) {
       ? `[District: ${districtId}] ${query.trim()}`
       : query.trim();
 
-    const command = new RetrieveAndGenerateCommand({
-      input: { text: searchQuery },
-      retrieveAndGenerateConfiguration: {
-        type: 'KNOWLEDGE_BASE',
-        knowledgeBaseConfiguration: {
-          knowledgeBaseId: kbId,
-          modelArn: BEDROCK_MODEL_ID.startsWith('arn:')
-            ? BEDROCK_MODEL_ID
-            : BEDROCK_MODEL_ID.match(/^(us\.|eu\.|ap\.|global\.)/)
-              ? `arn:aws:bedrock:${region}:${process.env.AWS_ACCOUNT_ID}:inference-profile/${BEDROCK_MODEL_ID}`
-              : `arn:aws:bedrock:${region}::foundation-model/${BEDROCK_MODEL_ID}`,
-          retrievalConfiguration: {
-            vectorSearchConfiguration: {
-              numberOfResults: 5,
-            },
-          },
-          generationConfiguration: {
-            promptTemplate: {
-              textPromptTemplate: `${SYSTEM_PROMPT}\n\n$search_results$\n\nHuman: $query$\nAssistant:`,
-            },
-            inferenceConfig: {
-              textInferenceConfig: {
-                maxTokens: 1024,
-                temperature: 0.1,
-              },
-            },
-          },
-        },
-      },
-      ...(sid ? { sessionId: sid } : {}),
-    });
+    let response = await bedrockRuntime.send(buildRagCommand(searchQuery, districtId, sid));
+    let answer = response.output?.text ?? '';
 
-    const response = await bedrockRuntime.send(command);
-    const answer = response.output?.text ?? '';
+    // If a follow-up turn hit Bedrock's canned refusal, retry once as a fresh
+    // standalone query (no session) — the question is usually answerable on its own.
+    if (sid && REFUSAL_PATTERN.test(answer)) {
+      console.log('Session response refused; retrying without session');
+      const retry = await bedrockRuntime.send(buildRagCommand(searchQuery, districtId, undefined));
+      const retryAnswer = retry.output?.text ?? '';
+      if (retryAnswer && !REFUSAL_PATTERN.test(retryAnswer)) {
+        response = retry;
+        answer = retryAnswer;
+      }
+    }
+
     const newSessionId = response.sessionId;
 
     const citations = (response.citations ?? []).flatMap((c) =>

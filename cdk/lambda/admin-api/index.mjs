@@ -208,6 +208,26 @@ async function deleteTranscript(districtId, videoId) {
   return buildResponse(200, { districtId, videoId, deleted: true });
 }
 
+// ── Bedrock KB metadata sidecar ──────────────────────────────────────────────
+// Every transcript needs a `<key>.metadata.json` carrying its districtId so the
+// chatbot's district-scoped retrieval filter can find it. Without this, an
+// uploaded transcript is ingested but invisible to district-filtered queries.
+
+async function putDistrictSidecar(s3Key, districtId) {
+  try {
+    await s3.send(
+      new PutObjectCommand({
+        Bucket: TRANSCRIPTS_BUCKET,
+        Key: `${s3Key}.metadata.json`,
+        Body: JSON.stringify({ metadataAttributes: { districtId } }),
+        ContentType: 'application/json',
+      }),
+    );
+  } catch (err) {
+    console.error('Failed to write district metadata sidecar:', err.message);
+  }
+}
+
 // ── Upload: presigned URL for direct S3 upload ───────────────────────────────
 
 async function getUploadUrl(body) {
@@ -265,8 +285,10 @@ async function getUploadUrl(body) {
   };
   await ddb.send(new PutCommand({ TableName: TRANSCRIPTS_TABLE, Item: record }));
 
-  // If it's a text file, trigger KB sync after upload
+  // Text files land in transcripts/ directly, so tag them now. Audio/video is
+  // tagged by the transcript-processor when it writes the final transcript.
   if (isText) {
+    await putDistrictSidecar(s3Key, districtId);
     syncKnowledgeBase().catch((err) => console.warn('KB sync failed:', err.message));
   }
 
@@ -322,6 +344,9 @@ async function uploadTranscriptText(body) {
     createdAt: new Date().toISOString(),
   };
   await ddb.send(new PutCommand({ TableName: TRANSCRIPTS_TABLE, Item: record }));
+
+  // Tag with districtId so district-filtered retrieval can find it
+  await putDistrictSidecar(s3Key, districtId);
 
   // Fire-and-forget KB sync — don't block the response
   syncKnowledgeBase().catch((err) => console.warn('KB sync failed:', err.message));
