@@ -1,10 +1,11 @@
 {
   "name": "chatbot-api",
   "version": "1.0.0",
-  "description": "Chatbot API using Bedrock RetrieveAndGenerate (RAG)",
+  "description": "Chatbot API using Bedrock Retrieve + Converse (RAG with client-threaded history)",
   "main": "index.js",
   "dependencies": {
     "@aws-sdk/client-bedrock-agent-runtime": "^3",
+    "@aws-sdk/client-bedrock-runtime": "^3",
     "@aws-sdk/client-dynamodb": "^3",
     "@aws-sdk/client-ssm": "^3",
     "@aws-sdk/lib-dynamodb": "^3"

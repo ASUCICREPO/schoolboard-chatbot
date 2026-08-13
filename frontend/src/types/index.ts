@@ -42,10 +42,16 @@ export interface Citation {
   metadata?: Record<string, unknown>;
 }
 
+export interface ChatTurn {
+  role: "user" | "assistant";
+  content: string;
+}
+
 export interface ChatRequest {
   query: string;
   districtId?: string;
   sessionId?: string;
+  history?: ChatTurn[];
 }
 
 export interface ChatResponse {

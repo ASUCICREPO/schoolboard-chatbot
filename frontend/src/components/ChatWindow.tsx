@@ -12,7 +12,9 @@ export default function ChatWindow() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [selectedDistrict, setSelectedDistrict] = useState("");
-  const [sessionId, setSessionId] = useState<string | undefined>();
+  // Stable id for this conversation (analytics grouping); memory is carried by
+  // sending prior messages as `history`, not by a server session.
+  const [sessionId, setSessionId] = useState<string>(() => randomUUID());
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -43,13 +45,13 @@ export default function ChatWindow() {
     setError(null);
 
     try {
+      const history = messages.map((m) => ({ role: m.role, content: m.content }));
       const response = await sendChatMessage({
         query,
         districtId: selectedDistrict || undefined,
         sessionId,
+        history,
       });
-
-      const isRefusal = /unable to assist|cannot assist|can't assist|I cannot help|I can't help/i.test(response.answer);
 
       const assistantMessage: ChatMessage = {
         id: randomUUID(),
@@ -60,7 +62,6 @@ export default function ChatWindow() {
       };
 
       setMessages((prev) => [...prev, assistantMessage]);
-      setSessionId(isRefusal ? undefined : response.sessionId);
     } catch (err) {
       const msg =
         err instanceof Error ? err.message : "Something went wrong. Please try again.";
@@ -71,7 +72,7 @@ export default function ChatWindow() {
       setLoading(false);
       inputRef.current?.focus();
     }
-  }, [input, loading, selectedDistrict, sessionId]);
+  }, [input, loading, selectedDistrict, sessionId, messages]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -82,7 +83,7 @@ export default function ChatWindow() {
 
   const handleDistrictChange = (id: string) => {
     setSelectedDistrict(id);
-    setSessionId(undefined);
+    setSessionId(randomUUID()); // fresh conversation id
     setMessages([]);
   };
 
